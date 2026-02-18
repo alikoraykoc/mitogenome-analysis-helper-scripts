@@ -21,23 +21,23 @@ EXPECTED EXCEL FORMAT:
 BASIC USAGE:
     python download_genbank.py --excel "Tetrigidae genbank.xlsx" --outdir output_fastas --email your@email.com
 
-ADVANCED USAGE (Specific Gene & GFF Annotations):
-    python download_genbank.py --excel "Tetrigidae genbank.xlsx" --outdir output_fastas --email your@email.com --column COX1 --gff --log download_cox1.log
+ADVANCED USAGE (Specific Gene & .gb Annotations):
+    python download_genbank.py --excel "Tetrigidae genbank.xlsx" --outdir output_fastas --email your@email.com --column COX1 --annotation --log download_cox1.log
 
 ARGUMENTS:
-    --excel     : Path to the input Excel (.xlsx) file (Required)
-    --outdir    : Directory to save the output FASTA and GFF files (Required)
-    --email     : Your NCBI email address for Entrez access (Required)
-    --api_key   : Your NCBI API key to increase rate limits (Optional)
-    --sheet     : Specific sheet name to read (Optional, defaults to first sheet)
-    --column    : Only process this specific column/gene (Optional)
-    --gff       : Also download GFF3 annotation files alongside FASTAs (Optional)
-    --log       : Path to the log file (Defaults to 'download.log')
-    --sleep     : Seconds to pause between NCBI requests (Defaults to 0.35s)
+    --excel         : Path to the input Excel (.xlsx) file (Required)
+    --outdir        : Directory to save the output FASTA and .gb files (Required)
+    --email         : Your NCBI email address for Entrez access (Required)
+    --api_key       : Your NCBI API key to increase rate limits (Optional)
+    --sheet         : Specific sheet name to read (Optional, defaults to first sheet)
+    --column        : Only process this specific column/gene (Optional)
+    --annotation    : Also download GenBank (full) annotation files alongside FASTAs (Optional)
+    --log           : Path to the log file (Defaults to 'download.log')
+    --sleep         : Seconds to pause between NCBI requests (Defaults to 0.35s)
 
 NOTES:
     - Automatically retries failed NCBI requests up to 3 times if the connection drops.
-    - Skips downloading GFF files if they already exist in the output folder, making it easy to resume stopped jobs.
+    - Skips downloading .gb files if they already exist in the output folder, making it easy to resume stopped jobs.
     - Pauses between downloads to respect NCBI rate limits and keep your IP from getting blocked.
 """
 
@@ -115,18 +115,18 @@ def fetch_fasta_by_accession(acc: str, email: str, api_key=None, db="nuccore"):
             time.sleep(2)
 
 
-def fetch_gff(acc: str, outdir: str, logfile: str, email: str, api_key: Optional[str] = None, genus_species: str = "unknown"):
-    outfile = os.path.join(outdir, f"{genus_species}.gff3")
+def fetch_annotation(acc: str, outdir: str, logfile: str, email: str, api_key: Optional[str] = None, genus_species: str = "unknown"):
+    outfile = os.path.join(outdir, f"{genus_species}.gb")
 
     if os.path.exists(outfile):
-        log_message(logfile, f"SKIP GFF exists: {acc}")
+        log_message(logfile, f"SKIP GB exists: {acc}")
         return
 
     url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
     params = {
         "db": "nuccore", 
         "id": acc, 
-        "rettype": "gff3", 
+        "rettype": "gbwithparts", 
         "retmode": "text",
         "email": email
     }
@@ -139,13 +139,13 @@ def fetch_gff(acc: str, outdir: str, logfile: str, email: str, api_key: Optional
             if r.status_code == 200 and r.text.strip():
                 with open(outfile, "w") as f:
                     f.write(r.text)
-                log_message(logfile, f"GFF downloaded: {acc}")
+                log_message(logfile, f".gb downloaded: {acc}")
                 return
         except requests.exceptions.RequestException:
             pass
         time.sleep(2)
         
-    log_message(logfile, f"GFF FAILED: {acc} after 3 attempts")
+    log_message(logfile, f"GB FAILED: {acc} after 3 attempts")
 
 
 # ================= MAIN =================
@@ -159,7 +159,8 @@ def main():
     ap.add_argument("--api_key", default=None, help="Your NCBI API key")
 
     ap.add_argument("--column", help="Process only this column")
-    ap.add_argument("--gff", action="store_true", help="Also download GFF3")
+    ap.add_argument("--start-after", help="Process after this column")
+    ap.add_argument("--annotation", action="store_true", help="Also download .gb file")
     ap.add_argument("--log", default="download.log", help="Path to log file")
 
     ap.add_argument("--sleep", type=float, default=0.35, help="Sleep time between requests")
@@ -169,7 +170,7 @@ def main():
     log_message(args.log, "=== DOWNLOAD START ===")
 
     # Read Excel
-    df = pd.read_excel(args.excel, sheet_name=args.sheet)
+    df = pd.read_excel(args.excel, sheet_name=args.sheet if args.sheet else 0)
 
     # Identify species column
     species_cols = [c for c in df.columns if str(c).strip().lower() == "species"]
@@ -184,6 +185,19 @@ def main():
             print(f"ERROR: Column '{args.column}' not found.", file=sys.stderr)
             sys.exit(1)
         target_cols = [args.column]
+    elif args.start_after:
+        start_val = args.start_after.strip().lower()
+        start_idx = -1
+        for i, col_name in enumerate(df.columns):
+            if start_val in str(col_name).strip().lower():
+                start_idx = i
+                break
+        # Check if the start column was actually found
+        if start_idx == -1:
+            print(f"ERROR: Column '{args.start_after}' not found in the Excel file.", file=sys.stderr)
+            print(f"Available columns are: {list(df.columns)}", file=sys.stderr)
+            sys.exit(1)
+        target_cols = df.columns[start_idx+1:]
     else:
         start_idx = list(df.columns).index(species_col)
         target_cols = df.columns[start_idx+1:]
@@ -222,8 +236,8 @@ def main():
                         written += 1
                         log_message(args.log, f"FASTA OK: {acc} for {gene}")
 
-                        if args.gff:
-                            fetch_gff(acc, args.outdir, args.log, args.email, args.api_key, header)
+                        if args.annotation:
+                            fetch_annotation(acc, args.outdir, args.log, args.email, args.api_key, header)
 
                     except Exception as e:
                         log_message(args.log, f"ERROR {acc}: {e}")
