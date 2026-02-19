@@ -9,7 +9,7 @@ set -euo pipefail
 # ==============================================================================
 
 # --- CONFIGURATION ---
-INDIR="/Users/koray/Desktop/phylogeny_mitogenome/nov-2025/run7_onlymtg/dataset"
+INDIR=""
 
 MAFFT_DIR="01_mafft"
 UNGAP_DIR="02_mafft_ungapped"
@@ -17,7 +17,7 @@ ALIGN_DIR="03_aligned"
 
 MAFFT_BIN="mafft"
 MUSCLE_BIN="muscle"
-MACSE_BIN="macse" # Note: 'module load macse' might be required on HPC clusters
+MACSE_BIN="macse"
 
 # --- INITIALIZATION ---
 mkdir -p "$MAFFT_DIR" "$UNGAP_DIR" "$ALIGN_DIR"
