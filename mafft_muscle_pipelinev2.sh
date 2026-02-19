@@ -9,7 +9,7 @@ set -euo pipefail
 
 # --- CONFIGURATION ---
 # Define input directory containing raw FASTA files
-INDIR="/Users/koray/Desktop/phylogeny_mitogenome/nov-2025/run7_onlymtg/dataset"
+INDIR=""
 
 # Define output directories for each pipeline stage
 MAFFT_DIR="01_mafft"
