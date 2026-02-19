@@ -22,7 +22,7 @@ MACSE_BIN="macse"
 # --- INITIALIZATION ---
 mkdir -p "$MAFFT_DIR" "$UNGAP_DIR" "$ALIGN_DIR"
 
-echo "[INFO] Starting Final Hybrid Alignment Pipeline..."
+echo "[INFO] Starting Hybrid Alignment Pipeline..."
 echo "[INFO] Input Directory : $INDIR"
 echo "[INFO] Final Outputs   : $ALIGN_DIR"
 echo "--------------------------------------------------------------------------------"
